@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MINEWORLD 3D - ROMAN</title>
+<style>
+  :root { --panel: rgba(18,24,31,.94); --line: #718096; --gold:#f6c453; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#87c9f5; color:white; font-family:system-ui,Arial,sans-serif; }
+  canvas { display:block; }
+  #hud { position:fixed; inset:0; pointer-events:none; text-shadow:2px 2px 2px #17202a; }
+  #brand { position:absolute; top:12px; left:14px; font-weight:900; font-size:clamp(16px,3vw,24px); letter-spacing:1px; }
+  #stats { position:absolute; top:48px; left:14px; font-size:14px; line-height:1.5; }
+  #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:26px; font-weight:300; }
+  #hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:#101820bb; padding:8px 12px; border-radius:8px; font-size:13px; text-align:center; max-width:90vw; }
+  #hotbar { position:absolute; bottom:58px; left:50%; transform:translateX(-50%); display:flex; gap:4px; }
+  .slot { width:42px;height:42px;border:2px solid #aab4be;background:#17202aaa;border-radius:5px;display:grid;place-items:center;font-size:22px; }
+  .slot.active { border:3px solid var(--gold); background:#36404bcc; }
+  .overlay { position:fixed; inset:0; background:#07111dcc; display:flex; align-items:center; justify-content:center; padding:16px; z-index:5; }
+  .panel { width:min(520px,94vw); max-height:90vh; overflow:auto; background:var(--panel); border:2px solid #8493a4; border-radius:16px; padding:22px; box-shadow:0 15px 50px #0008; }
+  h1,h2 { text-align:center; margin:4px 0 14px; }
+  h1 { color:#8be28b; font-size:clamp(24px,5vw,36px); }
+  button { border:0; border-radius:9px; padding:12px 16px; background:#368b4b; color:white; font-size:16px; font-weight:700; cursor:pointer; width:100%; margin:5px 0; }
+  button.secondary { background:#455465; }
+  button.gold { background:#a9781d; }
+  .controls { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:14px; }
+  .controls div { padding:6px 0; border-bottom:1px solid #ffffff22; }
+  kbd { background:#263545; border:1px solid #718096; border-radius:5px; padding:2px 6px; font-weight:bold; }
+  #mobile { position:fixed; inset:auto 0 10px 0; display:none; z-index:3; pointer-events:none; }
+  #pad { position:absolute; left:14px; bottom:0; display:grid; grid-template-columns:48px 48px 48px; grid-template-rows:48px 48px 48px; gap:3px; pointer-events:auto; }
+  .mb { background:#17202ab8; border:1px solid #ffffff88; border-radius:10px; width:48px;height:48px; padding:0; margin:0; touch-action:none; }
+  #actions { position:absolute; right:14px; bottom:0; display:grid; grid-template-columns:64px 64px; gap:7px; pointer-events:auto; }
+  #actions .mb { width:64px;height:48px;font-size:12px; }
+  #lookzone { position:fixed; right:0; top:0; width:58%; height:65%; z-index:1; touch-action:none; }
+  @media (pointer:coarse) { #mobile {display:block;} #hint {bottom:172px;} #hotbar {bottom:216px;} }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="brand">⛏️ MINEWORLD 3D</div>
+  <div id="stats">👤 ROMAN · ❤️ <span id="health">100</span><br>🌳 Mundo de supervivencia</div>
+  <div id="crosshair">+</div>
+  <div id="hotbar">
+    <div class="slot active" title="Tierra">🟫</div><div class="slot" title="Piedra">🪨</div><div class="slot" title="Madera">🪵</div><div class="slot" title="Hojas">🌿</div><div class="slot" title="Diamante">💎</div>
+  </div>
+  <div id="hint">Haz clic en JUGAR. PC: WASD + ratón · F5 cambia cámara · ESC pausa</div>
+</div>
+<div id="lookzone"></div>
+<div id="mobile">
+  <div id="pad">
+    <div></div><button class="mb" data-move="forward">▲</button><div></div>
+    <button class="mb" data-move="left">◀</button><button class="mb" data-move="back">▼</button><button class="mb" data-move="right">▶</button>
+    <div></div><button class="mb" id="jump">⤒</button><div></div>
+  </div>
+  <div id="actions">
+    <button class="mb" id="breakBtn">Picar</button><button class="mb" id="placeBtn">Poner</button>
+    <button class="mb" id="camBtn">Cámara</button><button class="mb" id="pauseBtn">Pausa</button>
+  </div>
+</div>
+
+<div class="overlay" id="start">
+  <div class="panel">
+    <h1>🌍 MINEWORLD 3D</h1>
+    <h2>¡Bienvenido, ROMAN!</h2>
+    <p>Explora un pequeño mundo de bloques, salta, rompe y coloca bloques. Esta es una primera versión jugable.</p>
+    <button id="play">▶ JUGAR</button>
+    <button class="secondary" id="showControls">🎮 Ver controles</button>
+    <p style="font-size:12px;color:#cbd5e0;text-align:center">En computador: usa Chrome o Edge. Se necesita conexión a internet para cargar el motor 3D.</p>
+  </div>
+</div>
+<div class="overlay" id="pause" style="display:none">
+  <div class="panel">
+    <h1>⏸️ JUEGO EN PAUSA</h1>
+    <button id="resume">▶ Continuar jugando</button>
+    <button class="secondary" id="controlsBtn">🎮 Ver controles</button>
+    <button class="secondary" id="restart">🔄 Reiniciar mundo</button>
+    <div id="controlsPanel" style="display:none;margin-top:12px">
+      <h2>Controles</h2>
+      <div class="controls">
+        <div><kbd>W A S D</kbd> Moverse</div><div><kbd>ESPACIO</kbd> Saltar</div>
+        <div><kbd>SHIFT</kbd> Correr</div><div><kbd>F5</kbd> Cambiar cámara</div>
+        <div><kbd>Ratón</kbd> Mirar</div><div><kbd>Clic izq.</kbd> Romper bloque</div>
+        <div><kbd>Clic der.</kbd> Colocar bloque</div><div><kbd>1–5</kbd> Elegir bloque</div>
+        <div><kbd>ESC</kbd> Pausar</div><div><kbd>E</kbd> Inventario (próximamente)</div>
+      </div>
+      <p style="font-size:13px;color:#cbd5e0">En celular/tablet: usa las flechas, arrastra en la parte derecha para mirar y toca Picar/Poner.</p>
+    </div>
+  </div>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87c9f5);
+scene.fog = new THREE.Fog(0x87c9f5, 22, 75);
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, .1, 120);
+const renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x63734b,2.0));
+const sun = new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(-20,35,15); sun.castShadow=true; scene.add(sun);
+
+const materials = {
+ grass:new THREE.MeshLambertMaterial({color:0x55a83d}),
+ dirt:new THREE.MeshLambertMaterial({color:0x80502c}),
+ stone:new THREE.MeshLambertMaterial({color:0x858585}),
+ wood:new THREE.MeshLambertMaterial({color:0x80512b}),
+ leaves:new THREE.MeshLambertMaterial({color:0x287d35}),
+ sand:new THREE.MeshLambertMaterial({color:0xd8c27b}),
+ diamond:new THREE.MeshLambertMaterial({color:0x29d7d0}),
+};
+const geo = new THREE.BoxGeometry(1,1,1);
+const blocks = [];
+const blockMap = new Map();
+const key=(x,y,z)=>`${x},${y},${z}`;
+function addBlock(x,y,z,type='dirt'){
+  const mesh=new THREE.Mesh(geo,materials[type]||materials.dirt);
+  mesh.position.set(x,y,z); mesh.castShadow=true; mesh.receiveShadow=true;
+  mesh.userData={x,y,z,type};
+  scene.add(mesh); blocks.push(mesh); blockMap.set(key(x,y,z),mesh); return mesh;
+}
+function removeBlock(mesh){
+  const {x,y,z}=mesh.userData; scene.remove(mesh); blockMap.delete(key(x,y,z));
+  const i=blocks.indexOf(mesh); if(i>=0) blocks.splice(i,1);
+}
+function tree(x,z){
+  for(let y=1;y<=3;y++) addBlock(x,y,z,'wood');
+  for(let dx=-2;dx<=2;dx++) for(let dz=-2;dz<=2;dz++)
+    for(let dy=3;dy<=5;dy++) if(Math.abs(dx)+Math.abs(dz)+(dy===5?1:0)<5) addBlock(x+dx,dy,z+dz,'leaves');
+}
+function terrain(){
+  for(let x=-17;x<=17;x++) for(let z=-17;z<=17;z++){
+    addBlock(x,-1,z,'dirt');
+    addBlock(x,0,z,(x*x+z*z)%11===0?'sand':'grass');
+    if(Math.abs(x)>2||Math.abs(z)>2){
+      if(Math.random()<.045 && Math.abs(x)>4 && Math.abs(z)>4) tree(x,z);
+      else if(Math.random()<.018) addBlock(x,1,z,'stone');
+    }
+  }
+  // Rocas decorativas y una pequeña veta de diamante visible en una pared rocosa.
+  for(let y=1;y<4;y++) for(let x=8;x<12;x++) addBlock(x,y,-9,'stone');
+  addBlock(9,2,-8,'diamond'); addBlock(10,2,-8,'diamond');
+}
+terrain();
+
+const roman = new THREE.Group(); scene.add(roman);
+const skin=new THREE.MeshLambertMaterial({color:0xe9bd91});
+const red=new THREE.MeshLambertMaterial({color:0xf01818});
+const black=new THREE.MeshLambertMaterial({color:0x171717});
+const brown=new THREE.MeshLambertMaterial({color:0x704322});
+function part(w,h,d,mat,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;roman.add(m);return m;}
+part(.65,.8,.35,red,0,1.35,0);
+part(.55,.55,.55,skin,0,2.02,0);
+part(.57,.18,.58,black,0,2.34,0);
+part(.18,.18,.08,black,-.14,2.06,-.29); part(.18,.18,.08,black,.14,2.06,-.29);
+part(.22,.7,.25,brown,-.19,.65,0); part(.22,.7,.25,brown,.19,.65,0);
+part(.2,.7,.25,skin,-.43,1.35,0); part(.2,.7,.25,skin,.43,1.35,0);\npart(.24,.42,.29,red,-.43,1.53,0); part(.24,.42,.29,red,.43,1.53,0);
+roman.position.set(0,0,4);
+
+const player={pos:new THREE.Vector3(0,0,4),vel:new THREE.Vector3(),yaw:0,pitch:0,onGround:false};
+let firstPerson=true, paused=true, locked=false, selected='dirt';
+const raycaster=new THREE.Raycaster();
+const center=new THREE.Vector2(0,0);
+const keys={};
+let touchMove={forward:false,back:false,left:false,right:false};
+let jumpRequested=false;
+const start=document.getElementById('start'), pause=document.getElementById('pause');
+const hint=document.getElementById('hint');
+function showPause(){paused=true; pause.style.display='flex'; if(document.pointerLockElement)document.exitPointerLock();}
+function resume(){
+  paused=false; pause.style.display='none'; start.style.display='none';
+  if(matchMedia('(pointer:fine)').matches) renderer.domElement.requestPointerLock?.();
+}
+document.getElementById('play').onclick=resume;
+document.getElementById('resume').onclick=resume;
+document.getElementById('showControls').onclick=()=>{start.style.display='none';showPause();document.getElementById('controlsPanel').style.display='block';};
+document.getElementById('controlsBtn').onclick=()=>{const p=document.getElementById('controlsPanel');p.style.display=p.style.display==='none'?'block':'none';};
+document.getElementById('pauseBtn').onclick=showPause;
+document.getElementById('restart').onclick=()=>location.reload();
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;});
+document.addEventListener('mousemove',e=>{if(!locked||paused)return; player.yaw-=e.movementX*.0025; player.pitch-=e.movementY*.0025; player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch));});
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Escape'&&!paused){showPause();e.preventDefault();}
+  if(e.code==='F5'&&!paused){firstPerson=!firstPerson;hint.textContent=firstPerson?'Cámara: primera persona':'Cámara: tercera persona';}
+  if(e.code.startsWith('Digit')){const n=Number(e.code.slice(5));selected=['dirt','stone','wood','leaves','diamond'][n-1]||selected;updateSlots();}
+  if(e.code==='Space'&&!e.repeat)jumpRequested=true;
+});
+document.addEventListener('keyup',e=>keys[e.code]=false);
+document.addEventListener('contextmenu',e=>e.preventDefault());
+function updateSlots(){document.querySelectorAll('.slot').forEach((s,i)=>s.classList.toggle('active',['dirt','stone','wood','leaves','diamond'][i]===selected));}
+document.querySelectorAll('.slot').forEach((s,i)=>s.onclick=()=>{selected=['dirt','stone','wood','leaves','diamond'][i];updateSlots();});
+
+function targetBlock(){
+  camera.updateMatrixWorld();
+  raycaster.setFromCamera(center,camera);
+  const hits=raycaster.intersectObjects(blocks,false);
+  return hits.find(h=>h.distance<6);
+}
+function breakBlock(){
+  const hit=targetBlock(); if(hit) removeBlock(hit.object);
+}
+function placeBlock(){
+  const hit=targetBlock(); if(!hit)return;
+  const p=hit.object.position.clone().add(hit.face.normal);
+  const x=Math.round(p.x),y=Math.round(p.y),z=Math.round(p.z);
+  if(blockMap.has(key(x,y,z)))return;
+  if(Math.abs(x-player.pos.x)<.8&&Math.abs(z-player.pos.z)<.8&&y<player.pos.y+2.5&&y>player.pos.y-.5)return;
+  addBlock(x,y,z,selected);
+}
+renderer.domElement.addEventListener('mousedown',e=>{
+  if(paused){return;}
+  if(e.button===0)breakBlock(); if(e.button===2)placeBlock();
+});
+document.getElementById('breakBtn').onclick=breakBlock;
+document.getElementById('placeBtn').onclick=placeBlock;
+document.getElementById('camBtn').onclick=()=>{firstPerson=!firstPerson;};
+
+document.querySelectorAll('[data-move]').forEach(btn=>{
+  const dir=btn.dataset.move;
+  const on=e=>{e.preventDefault();touchMove[dir]=true;};
+  const off=e=>{e.preventDefault();touchMove[dir]=false;};
+  btn.addEventListener('pointerdown',on); btn.addEventListener('pointerup',off); btn.addEventListener('pointerleave',off); btn.addEventListener('pointercancel',off);
+});
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jumpRequested=true;});
+const lookzone=document.getElementById('lookzone');
+let lastTouch=null;
+lookzone.addEventListener('pointerdown',e=>{lastTouch={x:e.clientX,y:e.clientY};});
+lookzone.addEventListener('pointermove',e=>{
+  if(!lastTouch||paused)return;
+  player.yaw-=(e.clientX-lastTouch.x)*.006; player.pitch-=(e.clientY-lastTouch.y)*.006;
+  player.pitch=Math.max(-1.35,Math.min(1.35,player.pitch)); lastTouch={x:e.clientX,y:e.clientY};
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>lookzone.addEventListener(ev,()=>lastTouch=null));
+
+function isSolidAt(x,y,z){
+  const bx=Math.round(x), by=Math.round(y), bz=Math.round(z);
+  return blockMap.has(key(bx,by,bz));
+}
+function update(dt){
+  if(paused)return;
+  const forward=(keys.KeyW||keys.ArrowUp||touchMove.forward?1:0)-(keys.KeyS||keys.ArrowDown||touchMove.back?1:0);
+  const side=(keys.KeyD||keys.ArrowRight||touchMove.right?1:0)-(keys.KeyA||keys.ArrowLeft||touchMove.left?1:0);
+  const speed=(keys.ShiftLeft||keys.ShiftRight)?8:5;
+  const direction=new THREE.Vector3(side,0,-forward);
+  if(direction.lengthSq()>0)direction.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw);
+  const nextX=player.pos.x+direction.x*speed*dt;
+  const nextZ=player.pos.z+direction.z*speed*dt;
+  // Colisión sencilla contra bloques a la altura del cuerpo.
+  if(!isSolidAt(nextX,player.pos.y+.4,nextZ)&&!isSolidAt(nextX,player.pos.y+1.4,nextZ)){player.pos.x=nextX;player.pos.z=nextZ;}
+  if(jumpRequested&&player.onGround){player.vel.y=7.2;player.onGround=false;}
+  jumpRequested=false;
+  player.vel.y-=19*dt;
+  let ny=player.pos.y+player.vel.y*dt;
+  if(ny<=.02){ny=0;player.vel.y=0;player.onGround=true;} else player.onGround=false;
+  // Bloques elevados detienen la caída al nivel de su superficie.
+  const below=blockMap.get(key(Math.round(player.pos.x),Math.round(ny-.1),Math.round(player.pos.z)));
+  if(below&&player.vel.y<=0){ny=below.position.y+1;player.vel.y=0;player.onGround=true;}
+  player.pos.y=ny;
+  roman.position.copy(player.pos);
+  roman.rotation.y=player.yaw;
+  roman.visible=!firstPerson;
+  if(firstPerson){
+    camera.position.set(player.pos.x,player.pos.y+1.65,player.pos.z);
+    camera.rotation.order='YXZ'; camera.rotation.y=player.yaw; camera.rotation.x=player.pitch;
+  }else{
+    const offset=new THREE.Vector3(0,2.3,5.2).applyAxisAngle(new THREE.Vector3(0,1,0),player.yaw);
+    camera.position.set(player.pos.x+offset.x,player.pos.y+offset.y,player.pos.z+offset.z);
+    camera.lookAt(player.pos.x,player.pos.y+1.35,player.pos.z);
+  }
+}
+let last=performance.now();
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt=Math.min((now-last)/1000,.04);last=now;
+  update(dt); renderer.render(scene,camera);
+}
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
